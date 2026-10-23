@@ -13,6 +13,7 @@ import {
   type TradeId,
 } from "../cms/content";
 import { Button, Chip, ConfirmDialog, Field, Panel, SortableList, TextArea, TextInput, Toggle, useToast } from "./ui";
+import { ImageField } from "./Media";
 import { NauticLogoMark } from "../components/Navbar";
 import { scrollToId } from "../components/motion";
 
@@ -110,13 +111,7 @@ export const HeroEditor = () => {
                 />
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Background image URL" htmlFor="hero-image">
-                  <TextInput
-                    id="hero-image"
-                    value={hero.image}
-                    onChange={(event) => patch("hero", { image: event.target.value })}
-                  />
-                </Field>
+                <ImageField id="hero-image" label="Background image URL" value={hero.image} onChange={(url) => patch("hero", { image: url })} />
                 <Field label="Image alt text" htmlFor="hero-alt">
                   <TextInput
                     id="hero-alt"
@@ -248,13 +243,7 @@ export const HeroEditor = () => {
                 />
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Image URL" htmlFor="cta-image">
-                  <TextInput
-                    id="cta-image"
-                    value={ctaBand.image}
-                    onChange={(event) => patch("ctaBand", { image: event.target.value })}
-                  />
-                </Field>
+                <ImageField id="cta-image" label="Image URL" value={ctaBand.image} onChange={(url) => patch("ctaBand", { image: url })} />
                 <Field label="Secondary label" htmlFor="cta-secondary">
                   <TextInput
                     id="cta-secondary"
@@ -410,8 +399,8 @@ export const HeroEditor = () => {
           <div className="flex items-center gap-2.5 px-4 py-3 rounded-[5px] bg-white border border-hairline">
             <span className="w-2 h-2 rounded-full bg-[#1f7a4d] pulse-ring shrink-0" />
             <p className="text-[12.5px] text-steel">
-              <span className="font-semibold text-ink">Autosave on.</span> Every keystroke publishes to the
-              live site and is stored in this browser.
+              <span className="font-semibold text-ink">Autosave on.</span> Edits save to the live site a moment
+              after you stop typing.
             </p>
           </div>
         </div>
@@ -520,13 +509,7 @@ export const TradesEditor = () => {
                 />
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Image URL" htmlFor="tr-image">
-                  <TextInput
-                    id="tr-image"
-                    value={trade.image}
-                    onChange={(event) => updateTrade({ image: event.target.value })}
-                  />
-                </Field>
+                <ImageField id="tr-image" label="Image URL" value={trade.image} onChange={(url) => updateTrade({ image: url })} />
                 <Field label="Image alt text" htmlFor="tr-alt">
                   <TextInput
                     id="tr-alt"
@@ -658,13 +641,7 @@ export const CoverageEditor = () => {
                 />
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Image URL" htmlFor="cv-image">
-                  <TextInput
-                    id="cv-image"
-                    value={coverage.image}
-                    onChange={(event) => patch("coverage", { image: event.target.value })}
-                  />
-                </Field>
+                <ImageField id="cv-image" label="Image URL" value={coverage.image} onChange={(url) => patch("coverage", { image: url })} />
                 <Field label="Image alt text" htmlFor="cv-alt">
                   <TextInput
                     id="cv-alt"
@@ -806,7 +783,7 @@ export const CoverageEditor = () => {
             </SortableList>
           </Panel>
           <p className="text-[12px] text-mist px-1">
-            Sector edits publish instantly and are stored in this browser.
+            Sector edits auto-save to the live site.
           </p>
         </div>
       </div>
@@ -1019,10 +996,12 @@ export const ContactEditor = () => {
 /* -------------------------------------------------------- settings editor */
 
 export const SettingsEditor = () => {
-  const { content, settings, setSettings, resetContent } = useCms();
+  const { content, settings, setSettings, resetContent, changePasscode } = useCms();
   const patch = useSectionPatch();
   const toast = useToast();
+  const [passcodeCurrent, setPasscodeCurrent] = useState("");
   const [passcodeDraft, setPasscodeDraft] = useState("");
+  const [passcodeBusy, setPasscodeBusy] = useState(false);
   const [passcodeConfirm, setPasscodeConfirm] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -1031,7 +1010,11 @@ export const SettingsEditor = () => {
     toast("Theme accent updated across the site");
   };
 
-  const savePasscode = () => {
+  const savePasscode = async () => {
+    if (!passcodeCurrent) {
+      toast("Enter your current passcode", "warn");
+      return;
+    }
     if (passcodeDraft.trim().length < 4) {
       toast("Passcode needs at least 4 characters", "warn");
       return;
@@ -1040,10 +1023,14 @@ export const SettingsEditor = () => {
       toast("Passcodes do not match", "warn");
       return;
     }
-    setSettings((prev) => ({ ...prev, passcode: passcodeDraft.trim() }));
+    setPasscodeBusy(true);
+    const result = await changePasscode(passcodeCurrent, passcodeDraft.trim());
+    setPasscodeBusy(false);
+    toast(result.message, result.ok ? "ok" : "warn");
+    if (!result.ok) return;
+    setPasscodeCurrent("");
     setPasscodeDraft("");
     setPasscodeConfirm("");
-    toast("Admin passcode updated");
   };
 
   return (
@@ -1123,8 +1110,21 @@ export const SettingsEditor = () => {
             </div>
           </Panel>
 
-          <Panel eyebrow="ACCESS" title="Admin passcode" description="Client-side lock for this demo CMS.">
+          <Panel
+            eyebrow="ACCESS"
+            title="Admin passcode"
+            description="Checked on the server and stored as a salted hash. Changing it signs out every other session."
+          >
             <div className="space-y-4">
+              <Field label="Current passcode" htmlFor="pw-current">
+                <TextInput
+                  id="pw-current"
+                  type="password"
+                  autoComplete="current-password"
+                  value={passcodeCurrent}
+                  onChange={(event) => setPasscodeCurrent(event.target.value)}
+                />
+              </Field>
               <Field label="New passcode" htmlFor="pw-new">
                 <TextInput
                   id="pw-new"
@@ -1143,11 +1143,10 @@ export const SettingsEditor = () => {
                 />
               </Field>
               <div className="flex items-center gap-2">
-                <Button variant="primary" onClick={savePasscode}>
+                <Button variant="primary" onClick={() => void savePasscode()} disabled={passcodeBusy}>
                   <KeyRound className="w-4 h-4" />
-                  Update passcode
+                  {passcodeBusy ? "Updating…" : "Update passcode"}
                 </Button>
-                <span className="text-[12px] text-mist">Current passcode is stored in this browser only.</span>
               </div>
             </div>
           </Panel>
@@ -1219,18 +1218,12 @@ export const SettingsEditor = () => {
               <Toggle
                 checked={settings.enquiriesEmailForward}
                 onChange={(next) => setSettings((prev) => ({ ...prev, enquiriesEmailForward: next }))}
-                label="Open an email draft after submission"
-                hint={`Drafts the logged enquiry to ${content.contact.email} in the visitor's mail app.`}
+                label="Email new enquiries to the team"
+                hint="Sends each logged enquiry to the inbox set as ENQUIRY_EMAIL_TO in wrangler.jsonc, via Cloudflare Email Routing."
               />
-              <Toggle
-                checked={settings.demoEnquiries}
-                onChange={(next) => setSettings((prev) => ({ ...prev, demoEnquiries: next }))}
-                label="Seed sample enquiries on a fresh browser"
-                hint="Loads six realistic job scopes the first time the desk is opened."
-              />
-              <Button variant="ghost" onClick={() => toast("Every field publishes the moment you type")}>
+              <Button variant="ghost" onClick={() => toast("Edits auto-save to the live site a moment after you stop typing")}>
                 <Save className="w-4 h-4" />
-                Publishing is instant
+                Publishing is automatic
               </Button>
             </div>
           </Panel>
@@ -1255,9 +1248,10 @@ export const SettingsEditor = () => {
         confirmLabel="Reset content"
         onCancel={() => setConfirmReset(false)}
         onConfirm={() => {
-          resetContent();
           setConfirmReset(false);
-          toast("Site content reset to defaults", "warn");
+          void resetContent().then((result) => {
+            if (result.ok) toast("Site content reset to defaults", "warn");
+          });
         }}
       />
     </div>
@@ -1286,8 +1280,8 @@ export const DataEditor = () => {
 
   const handleFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = importJson(String(reader.result ?? ""));
+    reader.onload = async () => {
+      const result = await importJson(String(reader.result ?? ""));
       toast(result.message, result.ok ? "ok" : "warn");
     };
     reader.onerror = () => toast("Could not read that file", "warn");
@@ -1300,8 +1294,8 @@ export const DataEditor = () => {
         <p className="label-mono text-ember">ADMIN · DATA &amp; BACKUP</p>
         <h1 className="display-wide mt-2 text-[clamp(1.7rem,3.2vw,2.4rem)] text-ink">Data &amp; backup</h1>
         <p className="mt-2 text-[13.5px] text-steel max-w-2xl">
-          Content and enquiries live in this browser's local storage. Export a JSON snapshot before clearing
-          data, or to move everything to another machine.
+          Content, settings and enquiries live in the Cloudflare D1 database; uploaded images live in R2.
+          Export a JSON snapshot before large changes, or to copy content to another deployment.
         </p>
       </header>
 
@@ -1374,9 +1368,9 @@ export const DataEditor = () => {
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
-              onClick={() => {
-                const count = loadSampleEnquiries();
-                toast(`${count} sample enquiries added`);
+              onClick={async () => {
+                const count = await loadSampleEnquiries();
+                if (count) toast(`${count} sample enquiries added`);
               }}
             >
               <Upload className="w-4 h-4" />
@@ -1406,18 +1400,18 @@ export const DataEditor = () => {
         title={confirm === "clear" ? "Clear every enquiry?" : "Reset all site content?"}
         message={
           confirm === "clear"
-            ? "All enquiries, statuses and internal notes will be permanently deleted from this browser."
+            ? "All enquiries, statuses and internal notes will be permanently deleted from the database."
             : "Every edit you have made to copy, services, sectors and channels will be replaced with the original content."
         }
         confirmLabel={confirm === "clear" ? "Clear enquiries" : "Reset content"}
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
           if (confirm === "clear") {
-            clearEnquiries();
-            toast("All enquiries cleared", "warn");
+            void clearEnquiries().then(() => toast("All enquiries cleared", "warn"));
           } else {
-            resetContent();
-            toast("Site content reset to defaults", "warn");
+            void resetContent().then((result) => {
+              if (result.ok) toast("Site content reset to defaults", "warn");
+            });
           }
           setConfirm(null);
         }}

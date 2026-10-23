@@ -75,8 +75,8 @@ export const Dashboard = ({ navigate }: DashboardProps) => {
             {content.brand.name} site manager
           </h1>
           <p className="mt-2 text-[13.5px] text-steel max-w-2xl">
-            Edit live copy, services and channels, then action enquiries as they land. Changes publish
-            instantly and are stored in this browser.
+            Edit live copy, services and channels, then action enquiries as they land. Changes auto-save
+            to the live site within a second.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -100,7 +100,7 @@ export const Dashboard = ({ navigate }: DashboardProps) => {
         <StatCard
           label="Total enquiries"
           value={enquiries.length}
-          note="All time, in this browser"
+          note="All time"
           icon={<Inbox className="w-4 h-4" />}
         />
         <StatCard

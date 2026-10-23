@@ -4,6 +4,7 @@ import {
   Database,
   Flame,
   Gauge,
+  Image as ImageIcon,
   Inbox,
   LayoutGrid,
   Lock,
@@ -11,11 +12,14 @@ import {
   Mail,
   MapPin,
   Palette,
+  Search,
   TriangleAlert,
 } from "lucide-react";
 import { useCms } from "../cms/store";
 import { NauticLogoMark } from "../components/Navbar";
-import { Button, Panel, ToastProvider, useToast } from "./ui";
+import { Button, Panel, useToast } from "./ui";
+import { Media } from "./Media";
+import { SeoEditor } from "./SeoEditor";
 import { Dashboard } from "./Dashboard";
 import { Enquiries } from "./Enquiries";
 import { ContactEditor, CoverageEditor, DataEditor, HeroEditor, SettingsEditor, TradesEditor } from "./Editors";
@@ -47,11 +51,13 @@ const NAV: NavGroup[] = [
       { label: "Trades & services", path: "/admin/content/trades", icon: <Flame className="w-4 h-4" /> },
       { label: "Coverage & sectors", path: "/admin/content/coverage", icon: <MapPin className="w-4 h-4" /> },
       { label: "Contact & channels", path: "/admin/content/contact", icon: <Mail className="w-4 h-4" /> },
+      { label: "SEO & sharing", path: "/admin/seo", icon: <Search className="w-4 h-4" /> },
     ],
   },
   {
     group: "Administration",
     items: [
+      { label: "Media library", path: "/admin/media", icon: <ImageIcon className="w-4 h-4" /> },
       { label: "Brand & theme", path: "/admin/settings", icon: <Palette className="w-4 h-4" /> },
       { label: "Data & backup", path: "/admin/data", icon: <Database className="w-4 h-4" /> },
     ],
@@ -65,6 +71,8 @@ const TITLES: Record<string, string> = {
   "/admin/content/trades": "Trades & services",
   "/admin/content/coverage": "Coverage & sectors",
   "/admin/content/contact": "Contact & channels",
+  "/admin/seo": "SEO & sharing",
+  "/admin/media": "Media library",
   "/admin/settings": "Brand & theme",
   "/admin/data": "Data & backup",
 };
@@ -76,20 +84,26 @@ const LoginGate = ({ navigate }: { navigate: (path: string) => void }) => {
   const toast = useToast();
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (login(passcode)) {
+    if (busy || !passcode.trim()) return;
+    setBusy(true);
+    const result = await login(passcode);
+    setBusy(false);
+    if (result.ok) {
       toast("Signed in to the Nautic Power CMS");
       navigate("/admin");
     } else {
-      setError("That passcode is not recognised.");
+      setError(result.message);
       setPasscode("");
+      inputRef.current?.focus();
     }
   };
 
@@ -187,19 +201,12 @@ const LoginGate = ({ navigate }: { navigate: (path: string) => void }) => {
               )}
             </div>
 
-            <Button type="submit" variant="primary" className="w-full h-11">
+            <Button type="submit" variant="primary" className="w-full h-11" disabled={busy}>
               <Lock className="w-4 h-4" />
-              Sign in
+              {busy ? "Signing in…" : "Sign in"}
             </Button>
           </form>
 
-          <div className="mt-6 p-3.5 rounded-[5px] bg-chalk border border-hairline">
-            <p className="label-mono text-steel">Demo passcode</p>
-            <p className="mt-1 font-mono text-[14px] font-semibold text-ink">nautic</p>
-            <p className="mt-1.5 text-[12px] text-mist">
-              Change it under Brand &amp; theme once signed in.
-            </p>
-          </div>
 
           <button
             type="button"
@@ -238,6 +245,10 @@ const AdminRoutes = ({ path, navigate }: AdminAppProps) => {
         return <CoverageEditor />;
       case "/admin/content/contact":
         return <ContactEditor />;
+      case "/admin/seo":
+        return <SeoEditor />;
+      case "/admin/media":
+        return <Media />;
       case "/admin/settings":
         return <SettingsEditor />;
       case "/admin/data":
@@ -260,7 +271,7 @@ const AdminRoutes = ({ path, navigate }: AdminAppProps) => {
 };
 
 export const AdminApp = (props: AdminAppProps) => {
-  const { isAuthed, logout, content, unreadCount } = useCms();
+  const { isAuthed, authChecked, logout, content, unreadCount, saveState, refreshEnquiries } = useCms();
   const { navigate, path } = props;
   const [mobileNav, setMobileNav] = useState(false);
 
@@ -268,13 +279,13 @@ export const AdminApp = (props: AdminAppProps) => {
     setMobileNav(false);
   }, [path]);
 
-  if (!isAuthed) {
-    return (
-      <ToastProvider>
-        <LoginGate navigate={navigate} />
-      </ToastProvider>
-    );
-  }
+  useEffect(() => {
+    if (isAuthed && (path === "/admin" || path.startsWith("/admin/enquiries"))) void refreshEnquiries();
+  }, [isAuthed, path, refreshEnquiries]);
+
+  if (!authChecked) return <div className="min-h-screen bg-chalk" aria-busy="true" />;
+
+  if (!isAuthed) return <LoginGate navigate={navigate} />;
 
   /* Authenticated shell — toasts provided by the app-level ToastProvider. */
 
@@ -345,8 +356,7 @@ export const AdminApp = (props: AdminAppProps) => {
         <button
           type="button"
           onClick={() => {
-            logout();
-            navigate("/admin");
+            void logout().then(() => navigate("/admin"));
           }}
           className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-[4px] text-[13.5px] font-medium text-white/70 hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
         >
@@ -391,9 +401,27 @@ export const AdminApp = (props: AdminAppProps) => {
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <span className="hidden sm:inline-flex items-center gap-2 label-mono text-steel px-2.5 py-1.5 rounded-[4px] bg-chalk border border-hairline">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1f7a4d] pulse-ring" />
-                Publishing live
+              <span
+                role="status"
+                aria-live="polite"
+                className="hidden sm:inline-flex items-center gap-2 label-mono text-steel px-2.5 py-1.5 rounded-[4px] bg-chalk border border-hairline"
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    saveState === "error"
+                      ? "bg-[#a3231c]"
+                      : saveState === "saving"
+                        ? "bg-[#8a6a05] pulse-ring"
+                        : "bg-[#1f7a4d]"
+                  }`}
+                />
+                {saveState === "saving"
+                  ? "Saving…"
+                  : saveState === "error"
+                    ? "Save failed — retrying on next edit"
+                    : saveState === "saved"
+                      ? "All changes live"
+                      : "Publishing live"}
               </span>
               {unreadCount > 0 && (
                 <button
@@ -413,8 +441,7 @@ export const AdminApp = (props: AdminAppProps) => {
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  logout();
-                  navigate("/admin");
+                  void logout().then(() => navigate("/admin"));
                 }}
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -451,8 +478,8 @@ export const AdminApp = (props: AdminAppProps) => {
 
         <footer className="px-4 sm:px-6 lg:px-8 pb-8 pt-2">
           <p className="text-[12px] text-mist">
-            {content.brand.name} CMS — content and enquiries are stored in this browser's local storage.
-            Export a JSON snapshot from Data &amp; backup before clearing site data.
+            {content.brand.name} CMS — edits auto-save to the live site. Export a JSON snapshot from Data &amp;
+            backup before large changes.
           </p>
         </footer>
       </div>

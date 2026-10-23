@@ -8,6 +8,7 @@ import {
   Send,
   TriangleAlert,
 } from "lucide-react";
+import { errorMessage } from "../cms/api";
 import { buildEnquiryEmail, useCms } from "../cms/store";
 import type { Enquiry, TradeId } from "../cms/content";
 import { Reveal } from "./motion";
@@ -46,6 +47,9 @@ export const Contact = ({ selectedTrades, onToggleTrade }: ContactProps) => {
   const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
   const [submitted, setSubmitted] = useState<Enquiry | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [website, setWebsite] = useState("");
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
@@ -80,21 +84,28 @@ export const Contact = ({ selectedTrades, onToggleTrade }: ContactProps) => {
     }
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const enquiry = addEnquiry({
-      trades: selectedTrades,
-      jobType,
-      siteMode,
-      name: name.trim(),
-      contact: contactDetail.trim(),
-      location: location.trim(),
-      details: details.trim(),
-      priority: urgent || jobType === "Breakdown / Urgent" ? "urgent" : "standard",
-    });
-    setSubmitted(enquiry);
-    if (settings.enquiriesEmailForward) {
-      window.location.href = buildEnquiryEmail(enquiry, contact.email);
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const enquiry = await addEnquiry({
+        trades: selectedTrades,
+        jobType,
+        siteMode,
+        name: name.trim(),
+        contact: contactDetail.trim(),
+        location: location.trim(),
+        details: details.trim(),
+        urgent,
+        website,
+      });
+      setSubmitted(enquiry);
+    } catch (err) {
+      setSubmitError(errorMessage(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -381,15 +392,35 @@ export const Contact = ({ selectedTrades, onToggleTrade }: ContactProps) => {
                       <div className="flex flex-wrap items-center gap-3 pt-1">
                         <button
                           type="submit"
-                          className="sweep group inline-flex items-center gap-2.5 px-6 py-3.5 rounded-[4px] bg-ink text-white text-[14px] font-semibold hover:bg-ember transition-colors cursor-pointer"
+                          disabled={submitting}
+                          className="sweep group inline-flex items-center gap-2.5 px-6 py-3.5 rounded-[4px] bg-ink text-white text-[14px] font-semibold hover:bg-ember transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                         >
                           <Send className="w-4 h-4" />
-                          Log enquiry with the team
+                          {submitting ? "Sending…" : "Log enquiry with the team"}
                         </button>
                         <p className="text-[12.5px] text-steel max-w-xs leading-snug">
                           Saved instantly to the Nautic Power enquiries desk
-                          {settings.enquiriesEmailForward ? ` and drafted to ${contact.email}` : ""}.
+                          {settings.enquiriesEmailForward ? " and emailed to the team" : ""}.
                         </p>
+                      </div>
+                      {submitError && (
+                        <p role="alert" className="flex items-center gap-1.5 text-[13px] font-medium text-[#a3231c]">
+                          <TriangleAlert className="w-4 h-4" />
+                          {submitError}
+                        </p>
+                      )}
+                      {/* Honeypot: hidden from people, tempting to bots. */}
+                      <div aria-hidden="true" className="absolute -left-[9999px] w-px h-px overflow-hidden">
+                        <label htmlFor="website">Website</label>
+                        <input
+                          id="website"
+                          name="website"
+                          type="text"
+                          tabIndex={-1}
+                          autoComplete="off"
+                          value={website}
+                          onChange={(event) => setWebsite(event.target.value)}
+                        />
                       </div>
                     </div>
                   </form>
@@ -423,13 +454,15 @@ export const Contact = ({ selectedTrades, onToggleTrade }: ContactProps) => {
                     </dl>
 
                     <div className="mt-5 flex flex-wrap items-center gap-3">
-                      <a
-                        href={buildEnquiryEmail(submitted, contact.email)}
-                        className="inline-flex items-center gap-2 px-5 py-3 rounded-[4px] bg-ink text-white text-[13.5px] font-semibold hover:bg-ember transition-colors"
-                      >
-                        <Mail className="w-4 h-4" />
-                        Email this to {contact.email}
-                      </a>
+                      {!settings.enquiriesEmailForward && (
+                        <a
+                          href={buildEnquiryEmail(submitted, contact.email)}
+                          className="inline-flex items-center gap-2 px-5 py-3 rounded-[4px] bg-ink text-white text-[13.5px] font-semibold hover:bg-ember transition-colors"
+                        >
+                          <Mail className="w-4 h-4" />
+                          Email this to {contact.email}
+                        </a>
+                      )}
                       <button
                         type="button"
                         onClick={() => copy(summaryText(submitted), "summary")}

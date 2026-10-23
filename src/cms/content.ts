@@ -121,13 +121,53 @@ export interface SiteContent {
     promise: string;
     adminNote: string;
   };
+  seo: SeoSettings;
+}
+
+/** Search and social metadata, rendered into <head> by the Worker. */
+export interface SeoSettings {
+  /** Browser tab and search result title. */
+  siteTitle: string;
+  metaDescription: string;
+  /** Comma-separated; ignored by Google but still read by some engines. */
+  keywords: string;
+  /** Public site URL, e.g. https://bizpress.createyourbestsite.com — blank uses the request host. */
+  canonicalUrl: string;
+  /** Hide the site from search engines (robots noindex + Disallow). */
+  noindex: boolean;
+  ogTitle: string;
+  ogDescription: string;
+  /** Social share image, ideally 1200×630. */
+  ogImage: string;
+  ogImageAlt: string;
+  twitterHandle: string;
+  themeColor: string;
+  locale: string;
+  /** Verification codes from Google Search Console / Bing Webmaster Tools. */
+  googleVerification: string;
+  bingVerification: string;
+  /** LocalBusiness structured data (JSON-LD). */
+  business: {
+    enabled: boolean;
+    type: string;
+    name: string;
+    phone: string;
+    email: string;
+    streetAddress: string;
+    locality: string;
+    region: string;
+    postalCode: string;
+    country: string;
+    areaServed: string;
+    openingHours: string;
+    priceRange: string;
+  };
 }
 
 export interface Settings {
   accent: string;
   accentPreset: string;
-  passcode: string;
-  demoEnquiries: boolean;
+  /** Email each new enquiry to the business inbox (Cloudflare send_email). */
   enquiriesEmailForward: boolean;
 }
 
@@ -246,8 +286,6 @@ export const formatRelative = (iso: string): string => {
 export const DEFAULT_SETTINGS: Settings = {
   accent: "#c8500e",
   accentPreset: "weld",
-  passcode: "nautic",
-  demoEnquiries: true,
   enquiriesEmailForward: true,
 };
 
@@ -549,6 +587,38 @@ export const DEFAULT_CONTENT: SiteContent = {
     badge: "Rural, CBD & Remote — We Come to You",
     promise: "Reliable service. Quality workmanship. One team for all three trades.",
     adminNote: "Staff & admin sign-in",
+  },
+  seo: {
+    siteTitle: "Nautic Power — Fabrication, Mechanical & Electrical Services",
+    metaDescription:
+      "One-stop shop for Fabrication, Mechanical and Electrical services across rural, CBD, regional and remote sites. On-site or in the workshop, day or night.",
+    keywords: "fabrication, welding, mechanical repairs, electrical services, rural, mining, remote sites",
+    canonicalUrl: "",
+    noindex: false,
+    ogTitle: "",
+    ogDescription: "",
+    ogImage: "/images/hero-rig.jpg",
+    ogImageAlt: "Nautic Power service vehicle on a rural site",
+    twitterHandle: "",
+    themeColor: "#101215",
+    locale: "en_AU",
+    googleVerification: "",
+    bingVerification: "",
+    business: {
+      enabled: true,
+      type: "HomeAndConstructionBusiness",
+      name: "Nautic Power",
+      phone: "",
+      email: "admin@nauticpower.com.au",
+      streetAddress: "",
+      locality: "",
+      region: "",
+      postalCode: "",
+      country: "AU",
+      areaServed: "Rural, CBD, regional and remote Australia",
+      openingHours: "Mo-Su 00:00-23:59",
+      priceRange: "",
+    },
   },
 };
 

@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bizpress",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Live at https://bizpress.createyourbestsite.com (and bizpress.createyourbestsite-cl.workers.dev).
+  "routes": [{ "pattern": "bizpress.createyourbestsite.com", "custom_domain": true }],
+
+  // Built React app. The Worker runs first for the routes that need it;
+  // everything else is served straight from static assets.
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/", "/index.html", "/api/*", "/media/*", "/robots.txt", "/sitemap.xml"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bizpress-cms",
+      "database_id": "f3538929-5a8f-4324-b4ab-35013752cb48",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "bizpress-media" }],
+
+  // Requires Cloudflare Email Routing on the sending domain (createyourbestsite.com) and a verified destination address.
+  "send_email": [{ "name": "EMAIL", "destination_address": "cv2k10@gmail.com" }],
+
+  "vars": {
+    "ENQUIRY_EMAIL_TO": "cv2k10@gmail.com",
+    "ENQUIRY_EMAIL_FROM": "enquiries@createyourbestsite.com",
+    // Default canonical address for SEO tags, robots.txt and sitemap.xml (overridable in the CMS).
+    "SITE_URL": "https://bizpress.createyourbestsite.com"
+  }
+
+  // Secrets (set with `wrangler secret put`, or in .dev.vars locally):
+  //   ADMIN_PASSCODE  – first-run admin passcode, replaced by a hash in D1 on first login
+  //   SESSION_SECRET  – long random string used to sign admin session cookies
+}

@@ -1,21 +1,32 @@
 {
-  "name": "react-vite-tailwind",
+  "name": "nauticpower-cms",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite build && vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "cf-typegen": "wrangler types worker/worker-configuration.d.ts",
+    "deploy": "npm run db:migrate:remote && vite build && wrangler deploy"
   },
   "dependencies": {
     "clsx": "2.1.1",
+    "hono": "4.13.13",
     "lucide-react": "^1.61.0",
+    "mimetext": "3.0.28",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "tailwind-merge": "3.4.0"
+    "tailwind-merge": "3.4.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1.65.0",
+    "@cloudflare/vitest-plugin": "^1.4.7",
     "@tailwindcss/vite": "4.1.17",
     "@types/node": "22.19.17",
     "@types/react": "19.2.7",
@@ -24,6 +35,7 @@
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vite": "7.3.2",
-    "vite-plugin-singlefile": "2.3.0"
+    "vitest": "4.1.12",
+    "wrangler": "4.152.0"
   }
 }

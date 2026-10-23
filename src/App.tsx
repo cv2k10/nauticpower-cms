@@ -61,11 +61,11 @@ const Routes = () => {
 
 export function App() {
   return (
-    <CmsProvider>
-      <ToastProvider>
+    <ToastProvider>
+      <CmsProvider>
         <Routes />
-      </ToastProvider>
-    </CmsProvider>
+      </CmsProvider>
+    </ToastProvider>
   );
 }
 
